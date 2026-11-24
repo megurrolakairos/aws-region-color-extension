@@ -39,7 +39,7 @@ const defaultColor = {
 function applyNavbarColor() {
     const regionButton = document.querySelector('[data-testid="awsc-nav-regions-menu-button"] > span');
     if (regionButton) {
-        const region = regionButton.innerText.trim();
+        const region = regionButton.innerText.trim().replace(/^.*\(([^)]+)\)$/, '$1');
         console.log(region);
 
         browser.storage.local.get(region, function(results) {
@@ -54,20 +54,41 @@ function applyNavbarColor() {
     }
 }
 
-// Function to observe changes in the DOM and trigger applyNavbarColor when regionButton appears
+// Observe region changes and replaced navbar nodes in AWS' dynamic console.
 function observeDOM() {
-    const observer = new MutationObserver(function(mutationsList) {
-        mutationsList.forEach(function(mutation) {
-            if (mutation.type === 'childList') {
-                if (!document.querySelector("#awsc-top-level-nav").style.backgroundColor) {
-                    applyNavbarColor();
-                    observer.disconnect(); // Disconnect the observer after applying color once, otherwise we see a spike of calls at the page load
-                }
-            }
-        });
+    let previousRegion = null;
+    let previousNavbar = null;
+
+    function refresh() {
+        const regionButton = document.querySelector(
+            '[data-testid="awsc-nav-regions-menu-button"] > span'
+        );
+        const navbar = document.querySelector("#awsc-top-level-nav");
+
+        if (!regionButton || !navbar) return;
+
+        const region = regionButton.textContent.trim();
+
+        if (
+            region !== previousRegion ||
+            navbar !== previousNavbar ||
+            !navbar.style.backgroundColor
+        ) {
+            previousRegion = region;
+            previousNavbar = navbar;
+            applyNavbarColor();
+        }
+    }
+
+    const observer = new MutationObserver(refresh);
+
+    observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        characterData: true
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+
+    refresh();
 }
 
-// Start observing the DOM
 observeDOM();
